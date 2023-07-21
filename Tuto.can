@@ -1,0 +1,511 @@
+/*
+    CAPL is the most used programming language for the development of automatic tests and simulations in the automotive world. It is the 
+main programming language for the most powerful CAN tools delivered by Vector. The programming language is based on C/C++ syntax and 
+offers some key features for embedded systems to the programmers. CAPL programmers can develop complete car simulations in CAPL and, 
+in the same time, develop automatic test environments for their systems. CAPL and the corresponding Vector tools offer:
+    . support for one or more communication channels
+    . control of the test scenarios and all test operations
+    . event based operations to be used in simulations or tests
+    . interconnections with other PC applications
+
+    CAPL is an event driven software because the execution of the test script or the execution of the simulation cannot be considered a 
+linear execution. At any time the program can jump to another procedure based on three different types of events.
+
+    The CAPL browser in which the complete development for automatic tests or car simulations is done includes a very useful text editor
+for the CAPL program and also a CAPL compiler. A program written in CAPL represents parts or the full behavior of one network node 
+available in the car. For more complex systems and simulations, the developer can create several different nodes connected on the same 
+CAN bus, each node with its own CAPL software behind. A simulation of all nodes is possible to verify the behavior. Once this is done, 
+the developer can deactivate any node from the communication BUS and connect the real system in order to test it.
+
+    Besides the general CAPL program execution, most of the tools offer other capabilities, useful for testing and debugging embedded 
+systems:
+    . accurate and easy to use trace window
+    . bus statistics
+    . graphic display of sent/received messages and signals
+    . logging / replay capabilities
+
+CAPL Programming:
+        The CAN Access Programming Language CAPL is a C-like programming language,
+    which allows you to program CANoe for individual applications.
+        CAPL is a  procedural  language  whereby  the  execution  of  program  blocks
+    is con-trolled by events. These program blocks are known as event procedures.
+        The program code that you define in event procedures is executed when the event occurs.
+        For example, you can send a message on the bus in response to a key press (on key), track 
+    the occurrence of messages on the bus (on message), or execute certain actions cyclically (on timer).
+  CAPL programs have three distinct parts:
+    1. Global Variable Declarations
+    2. Event Procedures
+    3. User-Defined Functions
+  CAPL Variables:
+        Data types available for variables include integers (dword, long, word, int, byte, char), floating point
+    numbers (float and double),
+        CAN messages (message) and timers (timer or msTimer). Except for the timers, all other variables can be 
+    initial-ized in their declarations.
+        Variables  of  the  type  timer  (based  on  seconds)  or  msTimer (based on millisec-onds) serve to 
+    generate time events. Timer variables are not automatically initialized at  the  program  start,  rather
+    they  must  be  "set"  explicitly  with  the  function setTimer().
+        Messages  to  be  output  from  the  CAPL  program  are  declared  with  the  key  word message. 
+    The complete declaration includes the message identifier or - when work-ing with symbolic databases 
+    - the message name. For example, you might write the following to output messages on the bus that have 
+    identifier A (hex) or 100 (dec) or the message EngineData defined in the database.
+        It is possible to access control information for the CAN message objects using the following component selectors:
+                ID                      Message identifier
+                CAN                     Chip number
+                DLC                     Data Length Code
+                DIR                     Direction of transmission, possible values: RX, TX,     
+                RTR                     Remote Transmission Request; possible values: 0 (No RTR), 1 (RTR)                     
+                TYPE                    Combination of DIR and RTR for efficient evaluation.(TYPE = (RTR << 8) | DIR )
+                TIME                    Time point, units: 10 microseconds
+*/
+variables
+{
+    int vector[5] = {1,2,3,4,5};
+    int matrix[2][2] = {{11,12},{21,22}};
+    char progname[10] = “CANoe“;
+    timer delayTimer; // Declaration of a second timer ...
+    msTimer cycTimer; // ... and a millisecond timer
+    msTimer myTimer; // Declare a timer variable
+    int msgCount; // Is set to 0 at measurement start
+    message 34 sendMsg = { // Declare message with Id 34
+                            dlc = 1, // Set Data Length Code = 1
+                            byte(0) = 1 // Set 1st data byte = 1
+                        }
+    message 0xA m1; // Message declaration (hex)
+    message 100 m2; // Message declaration (dec)
+    message EngineData m3; // Symbolic declaration
+    message * wcrd; // Declaration without Id
+}
+
+on start // preStart, stopMeasurement, key 'character' or *
+{
+    setTimer(myTimer, 1000); // Start the timer with a 1-second interval (1000 milliseconds)
+    setTimer(delayTimer,3); // Set timer to 3 sec
+    setTimer(cycTimer,100); // Set timer to 100 msec
+    write("This will be printed on start-up!");
+
+
+    output(m1); // Transmit message m1
+    output(m2); // Transmit message m2
+    output(m3); // Transmit message m3
+    wcrd.id = 0x1A0; // Define Id...
+    output(wcrd);
+}
+
+/* 
+Event Procedures:
+
+You can react to the following events in CAPL using event procedures
+            
+    Event                                Event Procedures
+
+    Receipt of a CAN message            on message{}
+    Press of a key                      on key{}
+    Initialization of measurement       on prestart{}
+    (before measurement start)        
+    Measurement start                   on start{}
+    End of measurement                  on stopMeasurement{}
+    CAN controller goes                 on errorActive{}
+    to ErrorActive
+    CAN controller goes                 on errorPassive{}
+    to Error Passive 
+    CAN controller reaches              on warningLimit{}
+    the warning limit
+    CAN controller goes                 on busOff{}
+    to Bus Off
+    Elapse of a timer                   on timer{}
+    Occurrence of an error frame        on errorFrame{}
+    Environment variable change         on envVar{}
+
+React to Messages:
+    The  event  procedure  type on message  is  provided  to  react  to  the  receipt  of CAN messages in the CAPL nodes.
+
+        on message 123                      React to message 123 (dec),
+                                            Receiving chip is not considered
+        on message 0x123                    React to message 123 (hex);
+                                            receive chip is not considered
+        on message EngineData               React to message EngineData
+        on message CAN1.123                 React to message 123,
+                                            if it is received by chip CAN1
+        on message *                        React to all messages
+        on message CAN2.*                   React to all messages
+                                            that are received by chip CAN2
+        on message 100-200                  React to all messages
+                                            with identifiers between 100 and 200
+*/
+on message CAN1.34 {
+
+                    message CAN2.34 sendMsg;    // Local message variable with
+                                                // name sendMsg, identifier 34,
+                                                // target controller CAN 2
+                    sendMsg = this;             // Copy all data and attributes
+                                                // of received message (this)
+                                                // to message to be transmitted
+                    sendMsg.byte(4) = 0;        // Change byte 4,
+                                                // always enter 0
+                    output(sendMsg);            // Transmit message
+
+                    }
+/*
+React to Keyboard Events
+    With on key procedures you can execute certain actions by key press. 
+
+            on key 'a'                      React to press of .a. key
+            on key ' ‘                      React to press of spacebar
+            on key 0x20                     React to press of spacebar
+            on key F1                       React to press of F1 key
+            on key ctrlF12                  React to press of Ctrl-F12
+            on key PageUp                   React to press of Page Up
+            on key Home                     React to press of Home
+            on key *                        React to any key press
+
+    The code for a key press can either be input as a character, number or a predefined name for a function key.
+*/
+variables {
+    int counter = 0;
+}
+on key 'a' {
+    write("A total of %d messages 0x1A1 counted",counter);
+}
+on message 0x1A1 {
+    counter++;
+    output(this); // Only in the evaluation branch
+}
+on message * {
+    output(this); // Only in the evaluation branch !!!
+}
+/*
+React to Changes in Values of Environment Variables
+        The “on envVar” event is caused by the value of an environmental variable changing. (Note:Remember that environmental
+    variables are only enabled in CANoe.) The “this” keyword is used in conjunction with the getValue() function to access
+    the value of the environmental variable.
+*/
+on envVar Switch {
+                    int val;
+                    val = getValue(this);           // Read value of Switch into val
+                }
+/*
+React to Time Events
+        CAPL allows you to create timers for seconds (Timer) or milliseconds (msTimer). After thesetimers have been set and expire, 
+    the corresponding “on timer” event procedure is executed. 
+        Thisfacility can be used to create a cyclic event if you reset the timer at the end of the timer event procedure. Timers can
+    also be used to respond to an event after a delay.
+        The setTimer() function takes two parameters, the name of the timer and the length of time to setthe timer. The length of time
+    parameter has different units depending on what kind of timer you are using. For a Timer, the units are seconds; for an msTimer,
+    the units are milliseconds.
+        The maximum values are 1799 seconds and 65,535 milliseconds, respectively. The cancelTimer() function can be called on a timer 
+    before it has expired to prevent the timer event from triggering. Calling the cancelTimer() function has no effect if the timer 
+    is not set or has already expired.
+*/
+msTimer myTimer;                                // Define millisecond timer
+message 100 msg;                                // Define message to be transmitted
+on key 'a' {                                    // React to key press of 'a'...
+    setTimer(myTimer,20);                       // ... Set timer to 20 ms
+}
+on timer myTimer {                              // Send message after timer...
+    output(msg);                                // ... has elapsed
+}
+/*
+React to System Events
+        The preStart, start, and stopMeasurement events are used to perform actions before, at the start of, and after CANalyzer
+    or CANoe measurements. If they are defined, each is called once permeasurement. When the “Go” button is pressed in CANalyzer
+    or CANoe, the preStart event procedure is executed (if one exists). You use this procedure to read data from files, 
+    initializevariables, or write to the Write window. Other actions, such as outputting a message onto the bus, are not available
+    in the preStart event. Generally, actions that are invalid in the preStart event procedure can be moved to the start event procedure.
+    After the preStart event procedure has completed executing, the start event procedure is executed (if one exists). 
+        The start event procedure can be used to initialize environmental variables, set timers, and output messages onto the bus. 
+    The measurement is also started at this time.
+React to System Events
+        When you press the Stop button in CANalyzer or CANoe, the stopMeasurement event procedure is executed (if one exists). You can use 
+    this procedure to print statistics in the Write window, output messages onto the bus, or write to a log file. After this event has 
+    finished executing, the measurement is stopped.
+React to CAN Controller Events
+        The  event  procedures  on errorActive,  on errrorPassive,  on warningLimit and on busOff are called during a state transition or 
+    in response  to a change in the CAN controller's error counter. Use these procedures to monitor  the error counter (e.g. output a 
+    warning), to terminate the measurement if necessary,  or to execute a reset after a transition to the Bus-Off state.
+        The  CAN  controller's  error  counters  can  be  accessed  within  the  CAN  controller's  event procedures using the key word 
+    this:
+*/
+on errorPassive {
+    write("CAN Controller ist in errorPassive")
+    write(" errorCountTX = %d", this.errorCountTX);
+    write(" errorCountRX = %d", this.errorCountRX);
+}
+/*
+Expressions in CAPL
+    CAPL syntax  is based on the C programming language. The following expressions  are permitted as they are in C:
+        · Instruction blocks: { ... }
+        · if { ... } and if {...} else { ... }
+        · switch, case, break, default
+        · for.., while.., do..while loops
+        · continue and break
+        · return
+        · ?: expression
+The Key Word this
+        The key word this is used to refer to the data structure of an object within an event procedure for receiving a CAN object or
+    environment variable. For example, the following accesses the first data byte of message 100 which is just being received: 
+*/
+on message 100 {
+    byte byte_0;
+    byte_0 = this.byte(0);
+}
+/*
+Event Message Transmission
+        When information only needs to be transferred on an event basis, the event message is used.
+    This sample program uses the pressing of the ‘b’ key on the PC keyboard to initiate a single CAN message transmission.
+*/
+variables {
+    message 0x555 msg1 = {dlc=1};
+}
+on key 'b' {
+    msg1.byte(0)=0xAA;
+    output(msg1);
+}
+/*
+Periodic Message Transmission
+    When information requires transferring on a repetitive basis, the periodic message is used.
+*/
+variables {
+    message 0x555 msg1 = {dlc=1};
+    msTimer timer1; // define timer1
+}
+on start {
+    setTimer(timer1,100); // initialize timer to 100 msec
+}
+on timer timer1 {
+    setTimer(timer1,100); // reset timer
+    msg1.byte(0)=msg1.byte(0)+1; // change the data
+    output(msg1); // output message
+}
+/*
+Conditionally Periodic Message Transmission
+        When information requires transferring on a repetitive basis only when a certain set of conditions is true, the conditionally 
+    periodic message is used.
+*/
+on timer timerA {
+    if(conditionA == 1) { // if condition is still true
+        setTimer(timerA,200); // then continue timer
+    }
+    msgA.byte(0)=msgA.byte(0)-1; // change the data
+    output(msgA); // output message
+}
+/*
+Handling of Run-Time Errors
+    A number of run-time errors are monitored in CAPL:
+        · Division by zero
+        · Exceeding upper or lower array limits
+        · Exceeding upper or lower offsets in the data fields of messages
+        · Stack overflow when CAPL subroutines are called
+        If a run-time error is detected, the instrinsic function runError() is called. This outputs a message to the Write window containing 
+    the name of the CAPL program, the error type and an error index. The location of the particular CAPL source text which caused the error 
+    is found with the help of the error index. The measurement is terminated after output of the message.The function runError() can also 
+    be called directly by the user to generate assertions.
+*/
+
+ variables
+{
+    message Message_A msg1; // Declaration of messages
+    msTimer Mytimer;
+    int TimerCounter=0;
+}
+
+on start
+{
+    msg1.dlc = 8;// set data length 8 bytes
+    msg1.byte(0) = 0xAA;  // Initializing data to the message bytes
+    msg1.byte(1) = 0xAB;
+    setTimer(Mytimer,500);// Initialize timer
+}
+on timer Mytimer
+{
+    output(msg1);
+    setTimer(Mytimer,500);// Reste timer
+
+    if(TimerCounter > 10 && TimerCounter <= 20)
+    {
+        setTimer(Mytimer,1000);
+    }
+    else if(TimerCounter > 20)
+    {
+        setTimer(Mytimer,2000);
+    }
+ }
+// React to events
+on message Message_A
+{
+    TimerCounter++;
+    write("%d\n", TimerCounter);
+  
+}
+on message CAN_Message {
+  float speed = CAN_Message.Speed; // Accessing the 'Speed' signal from the received 'CAN_Message' message
+  speed = 50.0; // Modifying the value of the 'Speed' signal
+  write("Current speed: %f km/h", speed); // Printing the modified speed value
+}
+/*cancelTimer /= setTimer */
+variables {
+    msTimer msgTimer;
+    message dataMsg dMsg;
+}
+on timer msgTimer {
+    send(dMsg);
+    setTimer(msgTimer, 200);
+}
+on key F1 {
+    cancelTimer(msgTimer); // cancel timer
+    write(“msgTimer canceled”);
+}
+on key F2 {
+    setTimer(msgTimer, 200); // set timer to 200 ms
+    write(“msgTimer started”);
+}
+/*
+Syntax              canOffline();  canOnline();
+Function            Cuts the connection between the node and the bus. Messages sent from the node are not passed through to the bus. 
+                The function canOnline() will restore the connection to the bus.
+*/
+/*
+
+Syntax              long getCardType();
+Function            Determines the type of CAN platform being used. Is needed e.g. to program the BTR (Bit Timing Register) and OCR 
+                (Output Control Register) values.
+Returns             Type of board as one of the following values:
+                    0 DBB196 - Daimler-Benz Board with FullCAN
+                    1 DBB196B – Daimler-Benz Board with BasicCAN
+                    2 CANIB - Bosch CANIB
+                    3 DEMO - Demo driver
+                    6 CANAC2 - Softing AC2/200/ANA
+                    7 CANAC2X - Softing AC 2/527/ANA
+                    8 CPC/PP - EMS wish module
+                    9 INDIGO - Silicon Graphics Indigo2
+                    10 CANCARD - PCMCIA 11 Bit
+                    11 CANCARDX - PCMCIA 29 Bit
+                    12 CANAC2B - Softing AC2/527 11 Bit
+                    13 VAN462 - NSI VAN card
+                    14 VANDEMO - VAN Demo driver
+*/
+switch(getCardType()) {
+case 6: 
+    setOcr(0,0x02); // CANAC2
+    break;
+default:
+    write(“Unknown driver %d”, getCardType());
+    break;
+}
+/*
+Syntax             outport(word addr, byte value);
+Function         Output a byte to a port.
+
+Syntax          output(message msg);
+                output(errorFrame);
+                output(pg pg_msg);
+Function        Outputs a message, an error frame, or a parameter group from the program block onto the CAN bus.
+*/
+outport (0x3f8, 12); // Outputs 12 to port 0x3f8
+variables {
+    message can2.125 msg = { // declare CAN-Message
+    dlc = 1,
+    byte(0) = 1
+};
+}
+on key F1 {
+    output (msg); // output Message to CAN 2
+}
+//output(errorFrame) Example
+on key F10 {
+    output(errorFrame); // output error frame to CAN1
+}
+//output(pg) Example
+variables {
+pg DashDisplay dDisplay;
+}
+on key F9 {
+dDisplay.FuelLevel.phys = 75;
+output(dDisplay);
+}
+/*
+Syntax              putValue(EnvVarName,int val);
+                    putValue(EnvVarName,float val);
+                    putValue(EnvVarName,char val[]);
+Function                Assigns the value val to the environment variable with identifier EnvVarName. Integers are assigned 
+                    to discrete environment variables, floating point numbers are assigned to continuous environment variables, 
+                    and character strings are assigned to character string environment variables.
+*/
+// Assign the value 0 to environment variable “Switch”
+putValue(Switch,0);
+// Assign the value 22.5 to environment variable “Temperature”
+putValue(Temperature,22.5);
+/*
+Syntax              resetCan();
+Function            Resets the CAN controller. This can be used to reset the CAN controller after a BUSOFF or to activate configuration
+                changes. Since execution of the function takes some time and the CAN controller is disconnected from the bus briefly, 
+                messages can be lost when this is performed.
+*/
+on key 'r' {        // Controller is reset when ‘r’ key is pressed
+    resetCan();
+}
+/*
+Syntax              runError(long err, long);
+Function            Triggers a run error. Outputs the error number to the Write window indicating the error number and the passed number, 
+                and then terminates the measurement.
+Parameters          Numbers that are represented in CANalyzer as a references for the user. The values under 1000 are reserved 
+                for internal purposes. The second parameter is reserved for future expansion. Currently, the second parameter can be any 
+                number.
+*/
+/*
+Syntax              setBtr(long channel, byte btr0, byte btr1);
+Function         Sets the baud rate. The values do not become active until the next call of the function                               resetCan().The function can also be used to automatically determine the baud rate. It                                 should be noted that these values depend on the CAN controller used.
+Parameters     CAN-Channel: 0 = both controllers
+                            1 = Channel 1
+                            2 = Channel 2
+                            BTR0: Value of Bit Timing Register 0
+                            BTR1: Value of Bit Timing Register 1
+
+*/
+setBtr(0, 0x00, 0x3a); // 500 kBaud for 82C200
+resetCan(); // activate
+/*
+Syntax             stop();
+Function         Programmed interrupt of the ongoing measurement
+*/
+if( isExtId(this) )
+    stop(); // End measurement if we find an extended ID
+/*
+Syntax                      setOcr(long channel, byte ocr);
+Function                    Sets the CAN controller’s Output Control Register. The values do not become active until the next call of the function resetCan(). It should be noted that these values depend on the                       CAN platform used.
+Parameters                  CAN-Channel: 
+                                0 = both controllers
+                                1 = Channel 1
+                                2 = Channel 2
+                                OCR: Value of the Output Control Registers
+*/
+setOcr(0, 0x02); // set
+resetCan(); // activate
+/*
+Syntax             sysExit();
+Function         Exits the system (CANalyzer or CANoe) from within a CAPL program.
+
+Syntax              long timeDiff(message msg1, NOW);
+                    long timeDiff(message msg1, message msg2);
+Function            Time difference between messages or between a message and the current time in ms (msg2 - msg1 or now - msg1).
+Note                Starting with CANalyzer 2.0, this difference can be calculated directly using the TIME message selector. 
+                    See the section on message selectors for more details.
+*/
+
+variables
+{
+  msTimer myTimer; // Declare a timer variable
+}
+
+on start
+{
+  setTimerCyclic(myTimer, 100); // Start the timer with a 100 ms interval
+}
+
+on timer msTimer
+{
+  // This function will be executed every 100 ms
+  // Add your code here for the cyclic operation
+}
+
+
+
